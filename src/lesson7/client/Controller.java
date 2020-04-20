@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 
 import java.net.URL;
@@ -46,15 +47,9 @@ public class Controller implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setAuthenticated(false);
-        clientsList.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) {
-                String nickname = clientsList.getSelectionModel().getSelectedItem();
-                msgField.setText("/w " + nickname + " ");
-                msgField.requestFocus();
-                msgField.selectEnd();
-            }
-        });
-        linkCallbacks();
+        clientsList.setOnMouseClicked(this::clientClickHandler);
+        createNetwork();
+        network.connect();
     }
 
     public void sendAuth() {
@@ -70,6 +65,10 @@ public class Controller implements Initializable {
         }
     }
 
+    public void sendExit() {
+        network.sendMsg("/end");
+    }
+
     public void showAlert(String msg) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
@@ -77,7 +76,7 @@ public class Controller implements Initializable {
         });
     }
 
-    public void linkCallbacks() {
+    public void createNetwork() {
         network = new Network();
         network.setCallOnException(args -> showAlert(args[0].toString()));
 
@@ -90,21 +89,28 @@ public class Controller implements Initializable {
 
         network.setCallOnMsgReceived(args -> {
             String msg = args[0].toString();
-            if (msg.startsWith("/")) {
-                if (msg.startsWith("/clients ")) {
-                    String[] tokens = msg.split("\\s");
-                    Platform.runLater(() -> {
-                        clientsList.getItems().clear();
-                        for (int i = 1; i < tokens.length; i++) {
-                            if (!tokens[i].equals(nickname)) {            //Не выводим в список пользователей самого себя
-                                clientsList.getItems().add(tokens[i]);
-                            }
+            if (msg.startsWith("/clients ")) {
+                String[] tokens = msg.split("\\s");
+                Platform.runLater(() -> {
+                    clientsList.getItems().clear();
+                    for (int i = 1; i < tokens.length; i++) {
+                        if (!nickname.equals(tokens[i])) {            //Не выводим в список пользователей самого себя
+                            clientsList.getItems().add(tokens[i]);
                         }
-                    });
-                }
+                    }
+                });
             } else {
                 textArea.appendText(msg + "\n");
             }
         });
+    }
+
+    private void clientClickHandler(MouseEvent event) {
+        if (event.getClickCount() == 2) {
+            String nickname = clientsList.getSelectionModel().getSelectedItem();
+            msgField.setText("/w " + nickname + " ");
+            msgField.requestFocus();
+            msgField.selectEnd();
+        }
     }
 }

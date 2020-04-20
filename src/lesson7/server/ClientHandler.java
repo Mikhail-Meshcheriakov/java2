@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class ClientHandler {
     private MyServer myServer;
@@ -41,7 +43,16 @@ public class ClientHandler {
 
     public void authentication() throws IOException {
         while (true) {
+            TimerTask timerTask = new TimerTask() {
+                @Override
+                public void run() {
+                    closeConnection();
+                }
+            };
+            Timer timer = new Timer();
+            timer.schedule(timerTask, 120000);
             String str = in.readUTF();
+            timer.cancel();
             if (str.startsWith("/auth")) {
                 String[] parts = str.split("\\s");
                 String nick = myServer.getAuthService().getNickByLoginPass(parts[1], parts[2]);
@@ -67,13 +78,18 @@ public class ClientHandler {
             String strFromClient = in.readUTF();
             System.out.println("от " + name + ": " + strFromClient);
             if (strFromClient.equals("/end")) {
+                myServer.unsubscribe(this);
+                myServer.broadcastMsg(name + " вышел из чата");
                 return;
             }
             //Обработка персонального сообщения
             if (strFromClient.startsWith("/w")) {
-                myServer.privateMsg(name + ": " + strFromClient.split("\\s")[2], strFromClient.split("\\s")[1]);
+                String[] tokens = strFromClient.split("\\s");
+                String nick = tokens[1];
+                String msg = strFromClient.substring(4 + nick.length());
+                myServer.sendMsgToClient(name, nick, msg);
             } else {
-                myServer.broadcastMsg(name + ": " + strFromClient);
+                myServer.broadcastMsg(name, strFromClient);
             }
         }
     }
@@ -87,8 +103,6 @@ public class ClientHandler {
     }
 
     public void closeConnection() {
-        myServer.unsubscribe(this);
-        myServer.broadcastMsg(name + " вышел из чата");
         try {
             in.close();
         } catch (IOException e) {
